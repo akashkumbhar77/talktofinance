@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_gemma/pigeon.g.dart';
 import 'package:flutter_mvp/services/gemma_models.dart';
 import 'package:flutter_mvp/services/gemma_runtime.dart';
+import 'package:flutter_mvp/services/download_cancel_token.dart';
 import 'package:flutter_mvp/services/settings_repo.dart';
 
 class SetupScreen extends StatefulWidget {
@@ -21,9 +23,12 @@ class _SetupScreenState extends State<SetupScreen> {
   final _cpuSha = TextEditingController();
 
   bool _useMock = true; // means "do not use Gemma" for now
+  bool _wifiOnly = true;
   String _selectedTier = 'gpu';
   String _status = 'Not loaded.';
   int? _downloadProgress;
+  bool _isDownloading = false;
+  DownloadCancelToken? _cancelToken;
 
   @override
   void initState() {
@@ -38,6 +43,7 @@ class _SetupScreenState extends State<SetupScreen> {
     _cpuSha.text = (await _settings.getTierCpuSha256()) ?? '';
     _selectedTier = await _settings.getSelectedTier();
     _useMock = await _settings.getUseMockExtractor();
+    _wifiOnly = await _settings.getWifiOnlyDownloads();
     if (mounted) setState(() {});
   }
 
@@ -48,6 +54,7 @@ class _SetupScreenState extends State<SetupScreen> {
     await _settings.setTierCpuSha256(_cpuSha.text.trim().isEmpty ? null : _cpuSha.text.trim());
     await _settings.setSelectedTier(_selectedTier);
     await _settings.setUseMockExtractor(_useMock);
+    await _settings.setWifiOnlyDownloads(_wifiOnly);
   }
 
   Future<GemmaTierConfig> _tierConfig(String which) async {
@@ -76,10 +83,25 @@ class _SetupScreenState extends State<SetupScreen> {
     setState(() {
       _status = 'Preparing Gemma…';
       _downloadProgress = null;
+      _isDownloading = true;
     });
 
     final gpu = await _tierConfig('gpu');
     final cpu = await _tierConfig('cpu');
+
+    if (_wifiOnly) {
+      final connectivity = await Connectivity().checkConnectivity();
+      final isWifi = connectivity.contains(ConnectivityResult.wifi);
+      if (!isWifi) {
+        setState(() {
+          _isDownloading = false;
+          _status = 'Wi‑Fi only is enabled. Connect to Wi‑Fi to download the model.';
+        });
+        return;
+      }
+    }
+
+    final cancelToken = _cancelToken = DownloadCancelToken();
 
     Stream<int> progressStream;
     if (_selectedTier == 'gpu') {
@@ -87,9 +109,21 @@ class _SetupScreenState extends State<SetupScreen> {
         gpu: gpu,
         cpu: cpu,
         onFallback: (msg) => setState(() => _status = msg),
+        cancelToken: cancelToken,
+        onRetry: (attempt, error, nextDelay) {
+          if (!mounted) return;
+          setState(() => _status = 'Retry $attempt due to $error. Next attempt in ${nextDelay.inSeconds}s…');
+        },
       );
     } else {
-      progressStream = _runtime.prepareTier(cpu);
+      progressStream = _runtime.prepareTier(
+        cpu,
+        cancelToken: cancelToken,
+        onRetry: (attempt, error, nextDelay) {
+          if (!mounted) return;
+          setState(() => _status = 'Retry $attempt due to $error. Next attempt in ${nextDelay.inSeconds}s…');
+        },
+      );
     }
 
     try {
@@ -103,8 +137,16 @@ class _SetupScreenState extends State<SetupScreen> {
       }
       setState(() => _status = 'Gemma ready ($active).');
     } catch (e) {
-      setState(() => _status = 'Gemma load failed: $e');
+      final msg = e is DownloadCancelled ? 'Download cancelled.' : 'Gemma load failed: $e';
+      setState(() => _status = msg);
+    } finally {
+      _cancelToken = null;
+      setState(() => _isDownloading = false);
     }
+  }
+
+  void _cancelDownload() {
+    _cancelToken?.cancel();
   }
 
   @override
@@ -133,6 +175,15 @@ class _SetupScreenState extends State<SetupScreen> {
           },
           title: const Text('Use mock extractor (Gemma disabled)'),
           subtitle: const Text('Turn off to download/load Gemma task bundle.'),
+        ),
+        SwitchListTile(
+          value: _wifiOnly,
+          onChanged: (v) async {
+            setState(() => _wifiOnly = v);
+            await _savePrefs();
+          },
+          title: const Text('Wi‑Fi only downloads'),
+          subtitle: const Text('Recommended for 700MB–1.3GB model downloads.'),
         ),
         const SizedBox(height: 8),
         SegmentedButton<String>(
@@ -180,10 +231,17 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: _downloadAndLoad,
+          onPressed: _isDownloading ? null : _downloadAndLoad,
           icon: const Icon(Icons.download),
           label: Text(_useMock ? 'Save' : 'Download + Load'),
         ),
+        const SizedBox(height: 8),
+        if (_isDownloading)
+          OutlinedButton.icon(
+            onPressed: _cancelDownload,
+            icon: const Icon(Icons.close),
+            label: const Text('Cancel download'),
+          ),
         const SizedBox(height: 12),
         if (_downloadProgress != null) Text('Download: $_downloadProgress%'),
         Text(_status),

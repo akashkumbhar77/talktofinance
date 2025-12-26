@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_mvp/services/device_storage.dart';
+import 'package:flutter_mvp/services/download_cancel_token.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -16,9 +17,13 @@ class BrainDownloader {
     required String? expectedSha256Hex,
     required String localFileName,
     int maxAttempts = 4,
+    DownloadCancelToken? cancelToken,
+    void Function(int attempt, Object error, Duration nextDelay)? onRetry,
   }) async* {
     final finalFile = await resolveLocalFile(localFileName);
     final partialFile = File('${finalFile.path}.partial');
+
+    if (cancelToken?.isCancelled == true) throw DownloadCancelled();
 
     // If already downloaded, just verify and return 100.
     if (await finalFile.exists()) {
@@ -44,12 +49,14 @@ class BrainDownloader {
     // Download with retries.
     var attempt = 0;
     while (true) {
+      if (cancelToken?.isCancelled == true) throw DownloadCancelled();
       attempt++;
       try {
         yield* _downloadOnce(
           url: url,
           totalBytes: totalBytes,
           partialFile: partialFile,
+          cancelToken: cancelToken,
         );
 
         // Finalize.
@@ -60,9 +67,11 @@ class BrainDownloader {
         yield 100;
         return;
       } catch (e) {
+        if (e is DownloadCancelled) rethrow;
         if (attempt >= maxAttempts) rethrow;
         // Exponential backoff.
         final delay = Duration(seconds: 1 << (attempt - 1));
+        onRetry?.call(attempt, e, delay);
         await Future<void>.delayed(delay);
       }
     }
@@ -118,6 +127,7 @@ class BrainDownloader {
     required String url,
     required int? totalBytes,
     required File partialFile,
+    required DownloadCancelToken? cancelToken,
   }) async* {
     await partialFile.parent.create(recursive: true);
 
@@ -128,6 +138,8 @@ class BrainDownloader {
 
     final client = http.Client();
     try {
+      if (cancelToken?.isCancelled == true) throw DownloadCancelled();
+
       // If we know total size and already complete, skip.
       if (totalBytes != null && totalBytes > 0 && existing >= totalBytes) {
         yield 100;
@@ -152,6 +164,10 @@ class BrainDownloader {
       var downloaded = existing;
       try {
         await for (final chunk in resp.stream) {
+          if (cancelToken?.isCancelled == true) {
+            client.close();
+            throw DownloadCancelled();
+          }
           sink.add(chunk);
           downloaded += chunk.length;
           if (totalBytes != null && totalBytes > 0) {

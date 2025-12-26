@@ -7,6 +7,7 @@ class SettingsRepo {
   static const _kTierCpuSha = 'gemma_tier_cpu_sha256';
   static const _kSelectedTier = 'gemma_selected_tier'; // "gpu" | "cpu"
   static const _kUseMock = 'use_mock_extractor'; // kept for compatibility; now means "use mock instead of Gemma"
+  static const _kWifiOnly = 'wifi_only_downloads';
 
   Future<String> getTierGpuUrl() async {
     final p = await SharedPreferences.getInstance();
@@ -66,6 +67,16 @@ class SettingsRepo {
   Future<void> setSelectedTier(String tier) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kSelectedTier, tier);
+  }
+
+  Future<bool> getWifiOnlyDownloads() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(_kWifiOnly) ?? true;
+  }
+
+  Future<void> setWifiOnlyDownloads(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kWifiOnly, v);
   }
 
   Future<bool> getUseMockExtractor() async {

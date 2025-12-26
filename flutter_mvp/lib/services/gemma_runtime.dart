@@ -4,6 +4,7 @@ import 'package:flutter_gemma/flutter_gemma_interface.dart';
 import 'package:flutter_gemma/core/model.dart';
 import 'package:flutter_gemma/core/message.dart';
 import 'package:flutter_mvp/services/brain_downloader.dart';
+import 'package:flutter_mvp/services/download_cancel_token.dart';
 import 'package:flutter_mvp/services/gemma_models.dart';
 
 class GemmaRuntime {
@@ -26,7 +27,11 @@ class GemmaRuntime {
   }
 
   /// Ensures the model file is downloaded, then creates an inference model for the given tier.
-  Stream<int> prepareTier(GemmaTierConfig tier) async* {
+  Stream<int> prepareTier(
+    GemmaTierConfig tier, {
+    DownloadCancelToken? cancelToken,
+    void Function(int attempt, Object error, Duration nextDelay)? onRetry,
+  }) async* {
     // If already active with the same tier, skip.
     if (_model != null && _activeTier == tier.tier) return;
 
@@ -39,9 +44,12 @@ class GemmaRuntime {
       url: tier.url,
       expectedSha256Hex: tier.sha256Hex,
       localFileName: fileName,
+      cancelToken: cancelToken,
+      onRetry: onRetry,
     );
 
     final file = await _downloader.resolveLocalFile(fileName);
+    if (cancelToken?.isCancelled == true) throw DownloadCancelled();
     await _plugin.modelManager.setModelPath(file.path);
 
     // Create model (this is the "load" step).
@@ -53,6 +61,7 @@ class GemmaRuntime {
     _activeTier = tier.tier;
 
     // Warmup to reduce first-token latency.
+    if (cancelToken?.isCancelled == true) throw DownloadCancelled();
     final session = await _model!.createSession(temperature: 0.0, topK: 1);
     await session.addQueryChunk(Message.text(text: 'Hi', isUser: true));
     await session.getResponse();
@@ -66,12 +75,15 @@ class GemmaRuntime {
     required GemmaTierConfig gpu,
     required GemmaTierConfig cpu,
     required void Function(String message) onFallback,
+    DownloadCancelToken? cancelToken,
+    void Function(int attempt, Object error, Duration nextDelay)? onRetry,
   }) async* {
     try {
-      yield* prepareTier(gpu);
+      yield* prepareTier(gpu, cancelToken: cancelToken, onRetry: onRetry);
     } catch (e) {
+      if (e is DownloadCancelled) rethrow;
       onFallback('GPU tier failed, falling back to CPU: $e');
-      yield* prepareTier(cpu);
+      yield* prepareTier(cpu, cancelToken: cancelToken, onRetry: onRetry);
     }
   }
 
