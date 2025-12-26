@@ -3,11 +3,10 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_mvp/data/app_db.dart';
 import 'package:flutter_mvp/domain/expense_extraction.dart';
-import 'package:flutter_mvp/services/mlc_client.dart';
 import 'package:flutter_mvp/services/settings_repo.dart';
+import 'package:flutter_mvp/services/gemma_runtime.dart';
 import 'package:pdf_text/pdf_text.dart';
 
 class ImportPdfScreen extends StatefulWidget {
@@ -18,7 +17,7 @@ class ImportPdfScreen extends StatefulWidget {
 }
 
 class _ImportPdfScreenState extends State<ImportPdfScreen> {
-  final _mlc = MlcClient();
+  final _runtime = GemmaRuntime.instance;
   final _settings = SettingsRepo();
 
   String _statementText = '';
@@ -85,18 +84,24 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
       _selected.clear();
     });
     try {
-      final jsonStr = _useMock
-          ? MlcClient.mockExtractStatementJson(_statementText)
-          : await _mlc.extractTransactionsFromStatement(_statementText);
-      final arr = json.decode(jsonStr) as List<dynamic>;
+      String jsonStr;
+      if (_useMock) {
+        jsonStr = _mockExtractStatementJson(_statementText);
+      } else {
+        final sb = StringBuffer();
+        await for (final tok in _runtime.extractStatementJsonStream(_statementText)) {
+          sb.write(tok);
+        }
+        jsonStr = sb.toString();
+      }
+
+      final arr = json.decode(_extractJsonArray(jsonStr)) as List<dynamic>;
       final list = arr.whereType<Map>().map((m) => m.map((k, v) => MapEntry(k.toString(), v))).toList();
       setState(() {
         _parsed = list.cast<Map<String, dynamic>>();
         _selected.addAll(List<int>.generate(_parsed.length, (i) => i));
         _status = 'Found ${_parsed.length} candidate transactions.';
       });
-    } on PlatformException catch (e) {
-      setState(() => _status = 'Extract failed: ${e.message ?? e.code}');
     } catch (e) {
       setState(() => _status = 'Extract failed: $e');
     } finally {
@@ -204,5 +209,35 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
       ],
     );
   }
+}
+
+String _extractJsonArray(String s) {
+  final start = s.indexOf('[');
+  final end = s.lastIndexOf(']');
+  if (start == -1 || end == -1 || end <= start) return '[]';
+  return s.substring(start, end + 1);
+}
+
+String _mockExtractStatementJson(String statementText) {
+  final lines = statementText.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList(growable: false);
+  final txs = <Map<String, Object?>>[];
+  for (final line in lines) {
+    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(line);
+    if (amountMatch == null) continue;
+    final amount = double.tryParse(amountMatch.group(1)!);
+    if (amount == null) continue;
+    txs.add({
+      'amount': amount,
+      'currency': line.contains('₹') || line.toLowerCase().contains('inr') || line.toLowerCase().contains('rs')
+          ? 'INR'
+          : (line.contains(r'$') ? 'USD' : null),
+      'merchant': null,
+      'category': null,
+      'date': null,
+      'notes': line,
+      'confidence': 0.25,
+    });
+  }
+  return const JsonEncoder.withIndent('  ').convert(txs);
 }
 

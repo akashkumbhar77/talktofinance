@@ -23,20 +23,16 @@ flutter pub get
 flutter run
 ```
 
-## MLC integration status
+## Gemma / MediaPipe integration status
 
-Right now the Android side implements the same platform-channel API but uses a **mock** extractor so the project builds without MLC runtime artifacts:
+This MVP uses **MediaPipe GenAI via `flutter_gemma`**.
 
-- Dart channels:
-  - MethodChannel: `edge_ai/mlc`
-  - EventChannel: `edge_ai/mlc_stream`
-- Android implementation: `android/app/src/main/kotlin/com/example/flutter_mvp/MainActivity.kt`
+- The “brain” is a **`.task` bundle** (LiteRT/MediaPipe format), downloaded on first run and stored under app documents.
+- The app supports a **2-tier strategy**:
+  - Tier A: GPU (default)
+  - Tier B: CPU fallback (used if GPU fails)
 
-To switch to real on-device MLC:
-
-- keep the Dart API as-is (`lib/services/mlc_client.dart`)
-- replace the Android methods (`loadModel`, `extractExpense`, `extractStatement`) to call MLC’s `MLCEngine` and stream deltas over `edge_ai/mlc_stream`
-- drop the required native runtime artifacts (JNI `.so` + tvm Java runtime jar) into the Android build per MLC docs (`https://llm.mlc.ai/docs/deploy/android.html`)
+Configure Tier URLs + optional SHA256 verification in the **Setup** tab.
 
 # flutter_mvp
 

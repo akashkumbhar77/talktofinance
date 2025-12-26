@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_mvp/data/app_db.dart';
 import 'package:flutter_mvp/domain/expense_extraction.dart';
-import 'package:flutter_mvp/services/mlc_client.dart';
 import 'package:flutter_mvp/services/settings_repo.dart';
 import 'package:flutter_mvp/services/speech_service.dart';
+import 'package:flutter_mvp/services/gemma_runtime.dart';
 
 class VoiceAddScreen extends StatefulWidget {
   const VoiceAddScreen({super.key});
@@ -20,9 +19,8 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
   final _text = TextEditingController();
   final _speech = SpeechService();
   final _settings = SettingsRepo();
-  final _mlc = MlcClient();
+  final _runtime = GemmaRuntime.instance;
 
-  StreamSubscription<String>? _tokenSub;
   String _streaming = '';
   String _finalJson = '';
   String? _error;
@@ -67,15 +65,30 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
       _finalJson = '';
     });
 
-    _tokenSub?.cancel();
-    _tokenSub = _mlc.streamTokens().listen((tok) {
-      setState(() => _streaming += tok);
-    });
-
     try {
-      final jsonStr = _useMock ? MlcClient.mockExtractExpenseJson(input) : await _mlc.extractExpenseJson(input);
-      final extracted = _useMock ? jsonStr : _streaming.isNotEmpty ? _streaming : jsonStr;
-      final obj = json.decode(_extractJsonObject(extracted)) as Map<String, dynamic>;
+      if (_useMock) {
+        final jsonStr = _mockExtractExpenseJson(input);
+        final obj = json.decode(_extractJsonObject(jsonStr)) as Map<String, dynamic>;
+        final parsed = ExpenseExtraction.fromJson(obj);
+
+        final db = await AppDb.open();
+        await db.insertExtraction(rawText: input, extractedJson: const JsonEncoder.withIndent('  ').convert(obj), parsed: parsed);
+        await db.close();
+
+        setState(() => _finalJson = const JsonEncoder.withIndent('  ').convert(obj));
+        return;
+      }
+
+      // Collect full output.
+      final sb = StringBuffer();
+      await for (final tok in _runtime.extractExpenseJsonStream(input)) {
+        sb.write(tok);
+        if (mounted) {
+          setState(() => _streaming = sb.toString());
+        }
+      }
+      final full = sb.toString();
+      final obj = json.decode(_extractJsonObject(full)) as Map<String, dynamic>;
       final parsed = ExpenseExtraction.fromJson(obj);
 
       final db = await AppDb.open();
@@ -83,20 +96,15 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
       await db.close();
 
       setState(() => _finalJson = const JsonEncoder.withIndent('  ').convert(obj));
-    } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? e.code);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      await _tokenSub?.cancel();
-      _tokenSub = null;
       setState(() => _busy = false);
     }
   }
 
   @override
   void dispose() {
-    _tokenSub?.cancel();
     _text.dispose();
     super.dispose();
   }
@@ -163,5 +171,24 @@ String _extractJsonObject(String s) {
   final end = s.lastIndexOf('}');
   if (start == -1 || end == -1 || end <= start) return '{}';
   return s.substring(start, end + 1);
+}
+
+String _mockExtractExpenseJson(String input) {
+  final amountMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(input);
+  final amount = amountMatch != null ? double.tryParse(amountMatch.group(1)!) : null;
+  final currency = input.contains('₹') || input.toLowerCase().contains('inr') || input.toLowerCase().contains('rs')
+      ? 'INR'
+      : (input.contains(r'$') ? 'USD' : null);
+
+  final out = <String, Object?>{
+    'amount': amount,
+    'currency': currency,
+    'merchant': null,
+    'category': null,
+    'date': null,
+    'notes': null,
+    'confidence': amount == null ? 0.2 : 0.4,
+  };
+  return const JsonEncoder.withIndent('  ').convert(out);
 }
 
