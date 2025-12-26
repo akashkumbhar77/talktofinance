@@ -41,6 +41,9 @@ dependencies:
   speech_to_text: ^7.3.0
   file_picker: ^10.3.8
   pdf_text: ^0.5.0
+  flutter_gemma: ^0.10.2
+  crypto: ^3.0.7
+  http: ^0.13.6
 
 dev_dependencies:
   flutter_test:
