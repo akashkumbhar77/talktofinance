@@ -34,7 +34,15 @@ class GemmaRuntime {
     await close();
 
     // Download/verify the task bundle.
-    yield* _downloader.downloadWithProgress(url: tier.url, expectedSha256Hex: tier.sha256Hex);
+    final fileName = _localFileNameForTier(tier);
+    yield* _downloader.downloadWithProgress(
+      url: tier.url,
+      expectedSha256Hex: tier.sha256Hex,
+      localFileName: fileName,
+    );
+
+    final file = await _downloader.resolveLocalFile(fileName);
+    await _plugin.modelManager.setModelPath(file.path);
 
     // Create model (this is the "load" step).
     _model = await _plugin.createModel(
@@ -133,6 +141,13 @@ Rules:
     } finally {
       await session.close();
     }
+  }
+
+  static String _localFileNameForTier(GemmaTierConfig tier) {
+    // Keep filename stable + readable, but avoid collisions between tiers.
+    final base = Uri.parse(tier.url).pathSegments.isNotEmpty ? Uri.parse(tier.url).pathSegments.last : 'model.task';
+    final safeBase = base.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return 'gemma_${tier.tier.name}_$safeBase';
   }
 }
 
