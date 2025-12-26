@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +8,6 @@ import 'package:flutter_mvp/services/download_cancel_token.dart';
 import 'package:flutter_mvp/services/ocr/pdf_ocr.dart';
 import 'package:flutter_mvp/services/settings_repo.dart';
 import 'package:flutter_mvp/services/gemma_runtime.dart';
-import 'package:pdf_text/pdf_text.dart';
 
 class ImportPdfScreen extends StatefulWidget {
   const ImportPdfScreen({super.key});
@@ -73,15 +71,10 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
         setState(() => _status = 'Could not read PDF path.');
         return;
       }
-      setState(() => _status = 'Extracting text from PDF…');
-      final doc = await PDFDoc.fromFile(File(path));
-      final text = await doc.text;
       setState(() {
         _pdfPath = path;
-        _statementText = text;
-        _status = text.trim().isEmpty
-            ? 'PDF has no selectable text (likely scanned). Tap “Run OCR”.'
-            : 'Extracted ${text.length} characters of text.';
+        _statementText = '';
+        _status = 'PDF selected. Tap “Run OCR (scanned PDF)”.';
       });
     } catch (e) {
       setState(() => _status = 'PDF extraction failed: $e');
