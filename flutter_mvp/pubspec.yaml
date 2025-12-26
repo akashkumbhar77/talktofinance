@@ -45,6 +45,8 @@ dependencies:
   crypto: ^3.0.7
   http: ^0.13.6
   connectivity_plus: ^7.0.0
+  google_mlkit_text_recognition: ^0.15.0
+  pdf_render: ^1.4.12
 
 dev_dependencies:
   flutter_test:

@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mvp/data/app_db.dart';
 import 'package:flutter_mvp/domain/expense_extraction.dart';
+import 'package:flutter_mvp/services/download_cancel_token.dart';
+import 'package:flutter_mvp/services/ocr/pdf_ocr.dart';
 import 'package:flutter_mvp/services/settings_repo.dart';
 import 'package:flutter_mvp/services/gemma_runtime.dart';
 import 'package:pdf_text/pdf_text.dart';
@@ -19,11 +21,17 @@ class ImportPdfScreen extends StatefulWidget {
 class _ImportPdfScreenState extends State<ImportPdfScreen> {
   final _runtime = GemmaRuntime.instance;
   final _settings = SettingsRepo();
+  final _pdfOcr = PdfOcrService();
 
+  String? _pdfPath;
   String _statementText = '';
   String _status = 'Pick a PDF statement to extract transactions locally.';
   bool _busy = false;
   bool _useMock = true;
+  bool _isOcring = false;
+  DownloadCancelToken? _ocrCancel;
+  int? _ocrPage;
+  int? _ocrPageCount;
 
   List<Map<String, dynamic>> _parsed = [];
   final Set<int> _selected = {};
@@ -45,6 +53,10 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
       _status = 'Picking PDF…';
       _parsed = [];
       _selected.clear();
+      _pdfPath = null;
+      _statementText = '';
+      _ocrPage = null;
+      _ocrPageCount = null;
     });
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -65,8 +77,11 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
       final doc = await PDFDoc.fromFile(File(path));
       final text = await doc.text;
       setState(() {
+        _pdfPath = path;
         _statementText = text;
-        _status = 'Extracted ${text.length} characters of text.';
+        _status = text.trim().isEmpty
+            ? 'PDF has no selectable text (likely scanned). Tap “Run OCR”.'
+            : 'Extracted ${text.length} characters of text.';
       });
     } catch (e) {
       setState(() => _status = 'PDF extraction failed: $e');
@@ -74,6 +89,49 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
       setState(() => _busy = false);
     }
   }
+
+  Future<void> _runOcr() async {
+    final pdfPath = _pdfPath;
+    if (pdfPath == null) return;
+    setState(() {
+      _isOcring = true;
+      _status = 'Running OCR…';
+      _ocrPage = null;
+      _ocrPageCount = null;
+      _statementText = '';
+    });
+    final token = _ocrCancel = DownloadCancelToken();
+    final sb = StringBuffer();
+    try {
+      await for (final p in _pdfOcr.ocrPdfWithProgress(
+        pdfPath: pdfPath,
+        cancelToken: token,
+        onPageText: (pageText) {
+          if (pageText.trim().isEmpty) return;
+          sb.writeln(pageText);
+          sb.writeln('\n');
+        },
+      )) {
+        setState(() {
+          _ocrPage = p.page;
+          _ocrPageCount = p.pageCount;
+          _status = 'OCR page ${p.page}/${p.pageCount}…';
+        });
+      }
+      setState(() {
+        _statementText = sb.toString();
+        _status = 'OCR complete. Extracted ${_statementText.length} characters.';
+      });
+    } catch (e) {
+      final msg = e is DownloadCancelled ? 'OCR cancelled.' : 'OCR failed: $e';
+      setState(() => _status = msg);
+    } finally {
+      _ocrCancel = null;
+      setState(() => _isOcring = false);
+    }
+  }
+
+  void _cancelOcr() => _ocrCancel?.cancel();
 
   Future<void> _extractTransactions() async {
     if (_statementText.trim().isEmpty) return;
@@ -140,6 +198,7 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
   @override
   Widget build(BuildContext context) {
     final preview = _statementText.length > 900 ? '${_statementText.substring(0, 900)}\n…' : _statementText;
+    final suggestOcr = (_pdfPath != null) && _statementText.trim().isEmpty;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -157,6 +216,17 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
               icon: const Icon(Icons.upload_file),
               label: const Text('Pick PDF'),
             ),
+            FilledButton.icon(
+              onPressed: (_busy || _isOcring || !suggestOcr) ? null : _runOcr,
+              icon: const Icon(Icons.document_scanner),
+              label: const Text('Run OCR (scanned PDF)'),
+            ),
+            if (_isOcring)
+              OutlinedButton.icon(
+                onPressed: _cancelOcr,
+                icon: const Icon(Icons.close),
+                label: const Text('Cancel OCR'),
+              ),
             FilledButton(
               onPressed: _busy || _statementText.trim().isEmpty ? null : _extractTransactions,
               child: Text(_busy ? 'Working…' : 'Extract transactions'),
@@ -167,6 +237,10 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
             ),
           ],
         ),
+        if (_isOcring && _ocrPage != null && _ocrPageCount != null) ...[
+          const SizedBox(height: 12),
+          Text('OCR progress: $_ocrPage/$_ocrPageCount'),
+        ],
         const SizedBox(height: 12),
         if (_useMock)
           const Text(

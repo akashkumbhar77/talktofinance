@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mvp/data/app_db.dart';
 import 'package:flutter_mvp/domain/expense_extraction.dart';
+import 'package:flutter_mvp/services/ocr/ocr_service.dart';
 import 'package:flutter_mvp/services/settings_repo.dart';
 import 'package:flutter_mvp/services/speech_service.dart';
 import 'package:flutter_mvp/services/gemma_runtime.dart';
@@ -20,6 +22,7 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
   final _speech = SpeechService();
   final _settings = SettingsRepo();
   final _runtime = GemmaRuntime.instance;
+  final _ocr = OcrService();
 
   String _streaming = '';
   String _finalJson = '';
@@ -52,6 +55,32 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
         setState(() => _text.text = t);
       });
       setState(() {});
+    }
+  }
+
+  Future<void> _pickReceiptImageAndOcr() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+        withData: false,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.first.path;
+      if (path == null) return;
+      final text = await _ocr.recognizeFilePath(path);
+      if (!mounted) return;
+      setState(() {
+        _text.text = text.trim().isEmpty ? _text.text : text;
+      });
+    } catch (e) {
+      setState(() => _error = 'OCR failed: $e');
+    } finally {
+      setState(() => _busy = false);
     }
   }
 
@@ -106,6 +135,7 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
   @override
   void dispose() {
     _text.dispose();
+    _ocr.close();
     super.dispose();
   }
 
@@ -134,6 +164,11 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
               onPressed: _busy ? null : _toggleMic,
               icon: Icon(_speech.isListening ? Icons.stop : Icons.mic),
               label: Text(_speech.isListening ? 'Stop' : 'Talk'),
+            ),
+            FilledButton.icon(
+              onPressed: _busy ? null : _pickReceiptImageAndOcr,
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Pick receipt (OCR)'),
             ),
             FilledButton(
               onPressed: _busy ? null : _extractAndSave,
