@@ -39,6 +39,10 @@ android {
     }
 }
 
+dependencies {
+    implementation(project(":mlc4j"))
+}
+
 flutter {
     source = "../.."
 }
