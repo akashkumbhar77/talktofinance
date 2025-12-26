@@ -5,7 +5,7 @@ import 'package:flutter_mvp/services/download_cancel_token.dart';
 import 'package:flutter_mvp/services/ocr/ocr_service.dart';
 import 'package:flutter_mvp/services/ocr/text_cleanup.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf_render/pdf_render.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 class PdfOcrProgress {
   final int page;
@@ -45,11 +45,11 @@ class PdfOcrService {
             height: fullHeight,
             fullWidth: page.width * scale,
             fullHeight: page.height * scale,
-            backgroundFill: true,
+            backgroundColor: const ui.Color(0xFFFFFFFF),
           );
 
           try {
-            final uiImage = await pageImage.createImageIfNotAvailable();
+            final uiImage = await pageImage.createImage();
             final bytes = await uiImage.toByteData(format: ui.ImageByteFormat.png);
             if (bytes == null) throw StateError('Failed to encode page to PNG');
 
@@ -67,7 +67,7 @@ class PdfOcrService {
             pageImage.dispose();
           }
         } finally {
-          // PdfPage has no dispose/close; document.dispose() owns lifecycle.
+          // pdfrx page lifecycle is managed by document; no page.dispose() required.
         }
 
         yield PdfOcrProgress(page: pageNum, pageCount: pageCount);
