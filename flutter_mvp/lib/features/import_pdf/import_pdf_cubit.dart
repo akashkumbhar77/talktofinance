@@ -35,6 +35,11 @@ class ImportPdfCubit extends Cubit<ImportPdfState> {
     emit(state.copyWith(prefsLoaded: true, useMockExtractor: useMock));
   }
 
+  /// Useful for tests (and future manual import flows).
+  void setStatementText(String text) {
+    emit(state.copyWith(statementText: text));
+  }
+
   Future<void> pickPdf() async {
     if (state.busy || state.isOcring) return;
 
