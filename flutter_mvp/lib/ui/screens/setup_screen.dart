@@ -160,92 +160,153 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('Setup', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        const Text('MediaPipe Gemma runtime (flutter_gemma). Download the “AI brain” (.task) once, then run fully on-device.'),
-        const SizedBox(height: 16),
-        SwitchListTile(
-          value: _useMock,
-          onChanged: (v) async {
-            setState(() => _useMock = v);
-            await _savePrefs();
-          },
-          title: const Text('Use mock extractor (Gemma disabled)'),
-          subtitle: const Text('Turn off to download/load Gemma task bundle.'),
-        ),
-        SwitchListTile(
-          value: _wifiOnly,
-          onChanged: (v) async {
-            setState(() => _wifiOnly = v);
-            await _savePrefs();
-          },
-          title: const Text('Wi‑Fi only downloads'),
-          subtitle: const Text('Recommended for 700MB–1.3GB model downloads.'),
-        ),
-        const SizedBox(height: 8),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'gpu', label: Text('GPU (default)')),
-            ButtonSegment(value: 'cpu', label: Text('CPU (fallback only)')),
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Setup'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            'On-device model',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Download the Gemma “.task” bundle once, then run fully offline.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _useMock,
+                    onChanged: (v) async {
+                      setState(() => _useMock = v);
+                      await _savePrefs();
+                    },
+                    title: const Text('Use mock extractor'),
+                    subtitle: const Text('Keeps the app usable without downloading the model.'),
+                  ),
+                  const Divider(),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _wifiOnly,
+                    onChanged: (v) async {
+                      setState(() => _wifiOnly = v);
+                      await _savePrefs();
+                    },
+                    title: const Text('Wi‑Fi only downloads'),
+                    subtitle: const Text('Recommended for large model downloads.'),
+                  ),
+                  const Divider(),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Preference',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'gpu', label: Text('GPU')),
+                      ButtonSegment(value: 'cpu', label: Text('CPU')),
+                    ],
+                    selected: {_selectedTier},
+                    onSelectionChanged: (s) async {
+                      setState(() => _selectedTier = s.first);
+                      await _savePrefs();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Download sources',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _gpuUrl,
+                    decoration: const InputDecoration(labelText: 'Tier A (GPU) .task URL'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _gpuSha,
+                    decoration: const InputDecoration(labelText: 'Tier A SHA-256 (optional)'),
+                  ),
+                  const Divider(),
+                  TextField(
+                    controller: _cpuUrl,
+                    decoration: const InputDecoration(labelText: 'Tier B (CPU) .task URL'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _cpuSha,
+                    decoration: const InputDecoration(labelText: 'Tier B SHA-256 (optional)'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _isDownloading ? null : _downloadAndLoad,
+                  icon: Icon(_useMock ? Icons.save : Icons.download),
+                  label: Text(_useMock ? 'Save settings' : 'Download & load'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (_isDownloading)
+                IconButton.filledTonal(
+                  onPressed: _cancelDownload,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cancel',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_downloadProgress != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(value: _downloadProgress! / 100.0),
+            ),
+            const SizedBox(height: 8),
+            Text('Download: $_downloadProgress%', style: Theme.of(context).textTheme.bodySmall),
           ],
-          selected: {_selectedTier},
-          onSelectionChanged: (s) async {
-            setState(() => _selectedTier = s.first);
-            await _savePrefs();
-          },
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _gpuUrl,
-          decoration: const InputDecoration(
-            labelText: 'Tier A (GPU) .task URL',
-            border: OutlineInputBorder(),
+          Card(
+            color: cs.surface,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_status)),
+                ],
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _gpuSha,
-          decoration: const InputDecoration(
-            labelText: 'Tier A SHA256 (optional, recommended)',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _cpuUrl,
-          decoration: const InputDecoration(
-            labelText: 'Tier B (CPU fallback) .task URL',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _cpuSha,
-          decoration: const InputDecoration(
-            labelText: 'Tier B SHA256 (optional, recommended)',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _isDownloading ? null : _downloadAndLoad,
-          icon: const Icon(Icons.download),
-          label: Text(_useMock ? 'Save' : 'Download + Load'),
-        ),
-        const SizedBox(height: 8),
-        if (_isDownloading)
-          OutlinedButton.icon(
-            onPressed: _cancelDownload,
-            icon: const Icon(Icons.close),
-            label: const Text('Cancel download'),
-          ),
-        const SizedBox(height: 12),
-        if (_downloadProgress != null) Text('Download: $_downloadProgress%'),
-        Text(_status),
-      ],
+        ],
+      ),
     );
   }
 }

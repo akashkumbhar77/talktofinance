@@ -3,6 +3,7 @@ import 'package:flutter_mvp/ui/screens/history_screen.dart';
 import 'package:flutter_mvp/ui/screens/import_pdf_screen.dart';
 import 'package:flutter_mvp/ui/screens/setup_screen.dart';
 import 'package:flutter_mvp/ui/screens/voice_add_screen.dart';
+import 'package:flutter_mvp/ui/app_theme.dart';
 
 class EdgeExpenseApp extends StatelessWidget {
   const EdgeExpenseApp({super.key});
@@ -11,10 +12,7 @@ class EdgeExpenseApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Edge Expense AI',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3D5AFE)),
-        useMaterial3: true,
-      ),
+      theme: buildAppTheme(),
       home: const _Home(),
     );
   }

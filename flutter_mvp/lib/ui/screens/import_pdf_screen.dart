@@ -190,90 +190,152 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final preview = _statementText.length > 900 ? '${_statementText.substring(0, 900)}\n…' : _statementText;
     final suggestOcr = (_pdfPath != null) && _statementText.trim().isEmpty;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('Import bank statement (PDF)', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text(_status),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            FilledButton.icon(
-              onPressed: _busy ? null : _pickPdf,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Pick PDF'),
-            ),
-            FilledButton.icon(
-              onPressed: (_busy || _isOcring || !suggestOcr) ? null : _runOcr,
-              icon: const Icon(Icons.document_scanner),
-              label: const Text('Run OCR (scanned PDF)'),
-            ),
-            if (_isOcring)
-              OutlinedButton.icon(
-                onPressed: _cancelOcr,
-                icon: const Icon(Icons.close),
-                label: const Text('Cancel OCR'),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Import'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bank statement (PDF)',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(_status, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _busy ? null : _pickPdf,
+                          icon: const Icon(Icons.upload_file),
+                          label: const Text('Pick PDF'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (_isOcring)
+                        IconButton.filledTonal(
+                          onPressed: _cancelOcr,
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Cancel OCR',
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: (_busy || _isOcring || !suggestOcr) ? null : _runOcr,
+                          icon: const Icon(Icons.document_scanner),
+                          label: const Text('Run OCR'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.tonal(
+                          onPressed: _busy || _statementText.trim().isEmpty ? null : _extractTransactions,
+                          child: Text(_busy ? 'Working…' : 'Extract'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _busy || _selected.isEmpty ? null : _importSelected,
+                      child: const Text('Import selected'),
+                    ),
+                  ),
+                  if (_isOcring && _ocrPage != null && _ocrPageCount != null) ...[
+                    const SizedBox(height: 12),
+                    Text('OCR: $_ocrPage / $_ocrPageCount', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(value: _ocrPageCount == 0 ? null : (_ocrPage! / _ocrPageCount!)),
+                    ),
+                  ],
+                ],
               ),
-            FilledButton(
-              onPressed: _busy || _statementText.trim().isEmpty ? null : _extractTransactions,
-              child: Text(_busy ? 'Working…' : 'Extract transactions'),
             ),
-            FilledButton(
-              onPressed: _busy || _selected.isEmpty ? null : _importSelected,
-              child: const Text('Import selected'),
+          ),
+          const SizedBox(height: 12),
+          if (_useMock)
+            Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(
+                'Mock extractor is enabled in Setup.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+          if (_statementText.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Text preview', style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    SelectableText(preview, style: const TextStyle(fontFamily: 'monospace')),
+                  ],
+                ),
+              ),
             ),
           ],
-        ),
-        if (_isOcring && _ocrPage != null && _ocrPageCount != null) ...[
-          const SizedBox(height: 12),
-          Text('OCR progress: $_ocrPage/$_ocrPageCount'),
+          if (_parsed.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Candidates',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ...List.generate(_parsed.length, (i) {
+              final m = _parsed[i];
+              final title = [
+                m['amount']?.toString(),
+                m['currency']?.toString(),
+                m['merchant']?.toString(),
+              ].whereType<String>().where((e) => e.isNotEmpty).join(' ');
+              final subtitle = (m['notes']?.toString() ?? '').trim();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Card(
+                  child: CheckboxListTile(
+                    value: _selected.contains(i),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selected.add(i);
+                        } else {
+                          _selected.remove(i);
+                        }
+                      });
+                    },
+                    title: Text(title.isEmpty ? 'Transaction ${i + 1}' : title),
+                    subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              );
+            }),
+          ],
         ],
-        const SizedBox(height: 12),
-        if (_useMock)
-          const Text(
-            'Mock extractor enabled (toggle in Setup).',
-            style: TextStyle(fontStyle: FontStyle.italic),
-          ),
-        if (_statementText.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text('Text preview:'),
-          SelectableText(preview, style: const TextStyle(fontFamily: 'monospace')),
-        ],
-        if (_parsed.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text('Candidates (${_parsed.length}):', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ...List.generate(_parsed.length, (i) {
-            final m = _parsed[i];
-            final title = [
-              m['amount']?.toString(),
-              m['currency']?.toString(),
-              m['merchant']?.toString(),
-            ].whereType<String>().where((e) => e.isNotEmpty).join(' ');
-            final subtitle = (m['notes']?.toString() ?? '').trim();
-            return CheckboxListTile(
-              value: _selected.contains(i),
-              onChanged: (v) {
-                setState(() {
-                  if (v == true) {
-                    _selected.add(i);
-                  } else {
-                    _selected.remove(i);
-                  }
-                });
-              },
-              title: Text(title.isEmpty ? 'Transaction ${i + 1}' : title),
-              subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-            );
-          }),
-        ],
-      ],
+      ),
     );
   }
 }

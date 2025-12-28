@@ -141,62 +141,131 @@ class _VoiceAddScreenState extends State<VoiceAddScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('Add expense (voice/text)', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _text,
-          minLines: 3,
-          maxLines: 8,
-          decoration: const InputDecoration(
-            labelText: 'Say or type: “Bought coffee for 250 rupees at CCD”',
-            border: OutlineInputBorder(),
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Add'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Describe an expense',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _text,
+                    minLines: 3,
+                    maxLines: 10,
+                    decoration: const InputDecoration(
+                      labelText: 'Example: Bought coffee for ₹250 at CCD',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _busy ? null : _toggleMic,
+                          icon: Icon(_speech.isListening ? Icons.stop : Icons.mic),
+                          label: Text(_speech.isListening ? 'Stop' : 'Talk'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _busy ? null : _pickReceiptImageAndOcr,
+                          icon: const Icon(Icons.receipt_long),
+                          label: const Text('Receipt OCR'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _busy ? null : _extractAndSave,
+                      child: Text(_busy ? 'Extracting…' : 'Extract & Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            FilledButton.icon(
-              onPressed: _busy ? null : _toggleMic,
-              icon: Icon(_speech.isListening ? Icons.stop : Icons.mic),
-              label: Text(_speech.isListening ? 'Stop' : 'Talk'),
+          const SizedBox(height: 12),
+          if (_useMock)
+            Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(
+                'Mock extractor is enabled in Setup.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
             ),
-            FilledButton.icon(
-              onPressed: _busy ? null : _pickReceiptImageAndOcr,
-              icon: const Icon(Icons.receipt_long),
-              label: const Text('Pick receipt (OCR)'),
-            ),
-            FilledButton(
-              onPressed: _busy ? null : _extractAndSave,
-              child: Text(_busy ? 'Extracting…' : 'Extract & Save'),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: cs.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline, color: cs.onErrorContainer),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onErrorContainer),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-        if (_useMock)
-          const Text(
-            'Mock extractor enabled (toggle in Setup).',
-            style: TextStyle(fontStyle: FontStyle.italic),
-          ),
-        if (_streaming.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text('Streaming output:'),
-          SelectableText(_streaming, style: const TextStyle(fontFamily: 'monospace')),
+          if (_streaming.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Streaming', style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    SelectableText(_streaming, style: const TextStyle(fontFamily: 'monospace')),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (_finalJson.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Saved', style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    SelectableText(_finalJson, style: const TextStyle(fontFamily: 'monospace')),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
-        if (_finalJson.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text('Saved JSON:'),
-          SelectableText(_finalJson, style: const TextStyle(fontFamily: 'monospace')),
-        ],
-        if (_error != null) ...[
-          const SizedBox(height: 12),
-          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-        ],
-      ],
+      ),
     );
   }
 }
