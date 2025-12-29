@@ -2,7 +2,6 @@ import 'package:equatable/equatable.dart';
 
 class ImportPdfState extends Equatable {
   final bool prefsLoaded;
-  final bool useMockExtractor;
 
   final String? pdfPath;
   final String statementText;
@@ -18,7 +17,6 @@ class ImportPdfState extends Equatable {
 
   const ImportPdfState({
     required this.prefsLoaded,
-    required this.useMockExtractor,
     required this.pdfPath,
     required this.statementText,
     required this.status,
@@ -32,7 +30,6 @@ class ImportPdfState extends Equatable {
 
   factory ImportPdfState.initial() => const ImportPdfState(
         prefsLoaded: false,
-        useMockExtractor: true,
         pdfPath: null,
         statementText: '',
         status: 'Pick a PDF statement to extract transactions locally.',
@@ -46,7 +43,6 @@ class ImportPdfState extends Equatable {
 
   ImportPdfState copyWith({
     bool? prefsLoaded,
-    bool? useMockExtractor,
     String? pdfPath,
     String? statementText,
     String? status,
@@ -60,7 +56,6 @@ class ImportPdfState extends Equatable {
   }) {
     return ImportPdfState(
       prefsLoaded: prefsLoaded ?? this.prefsLoaded,
-      useMockExtractor: useMockExtractor ?? this.useMockExtractor,
       pdfPath: clearPdfPath ? null : (pdfPath ?? this.pdfPath),
       statementText: statementText ?? this.statementText,
       status: status ?? this.status,
@@ -76,7 +71,6 @@ class ImportPdfState extends Equatable {
   @override
   List<Object?> get props => [
         prefsLoaded,
-        useMockExtractor,
         pdfPath,
         statementText,
         status,

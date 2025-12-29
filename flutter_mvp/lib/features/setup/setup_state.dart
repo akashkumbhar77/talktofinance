@@ -8,7 +8,6 @@ class SetupState extends Equatable {
   final String cpuUrl;
   final String cpuSha256;
 
-  final bool useMockExtractor;
   final bool wifiOnlyDownloads;
   final String selectedTier; // 'gpu' | 'cpu'
 
@@ -22,7 +21,6 @@ class SetupState extends Equatable {
     required this.gpuSha256,
     required this.cpuUrl,
     required this.cpuSha256,
-    required this.useMockExtractor,
     required this.wifiOnlyDownloads,
     required this.selectedTier,
     required this.status,
@@ -36,7 +34,6 @@ class SetupState extends Equatable {
         gpuSha256: '',
         cpuUrl: '',
         cpuSha256: '',
-        useMockExtractor: true,
         wifiOnlyDownloads: true,
         selectedTier: 'gpu',
         status: 'Not loaded.',
@@ -50,7 +47,6 @@ class SetupState extends Equatable {
     String? gpuSha256,
     String? cpuUrl,
     String? cpuSha256,
-    bool? useMockExtractor,
     bool? wifiOnlyDownloads,
     String? selectedTier,
     String? status,
@@ -63,7 +59,6 @@ class SetupState extends Equatable {
       gpuSha256: gpuSha256 ?? this.gpuSha256,
       cpuUrl: cpuUrl ?? this.cpuUrl,
       cpuSha256: cpuSha256 ?? this.cpuSha256,
-      useMockExtractor: useMockExtractor ?? this.useMockExtractor,
       wifiOnlyDownloads: wifiOnlyDownloads ?? this.wifiOnlyDownloads,
       selectedTier: selectedTier ?? this.selectedTier,
       status: status ?? this.status,
@@ -79,7 +74,6 @@ class SetupState extends Equatable {
         gpuSha256,
         cpuUrl,
         cpuSha256,
-        useMockExtractor,
         wifiOnlyDownloads,
         selectedTier,
         status,

@@ -73,14 +73,6 @@ class _SetupScreenState extends State<SetupScreen> {
                     children: [
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        value: state.useMockExtractor,
-                        onChanged: cubit.setUseMockExtractor,
-                        title: const Text('Use mock extractor'),
-                        subtitle: const Text('Keeps the app usable without downloading the model.'),
-                      ),
-                      const Divider(),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
                         value: state.wifiOnlyDownloads,
                         onChanged: cubit.setWifiOnlyDownloads,
                         title: const Text('Wi‑Fi only downloads'),
@@ -151,8 +143,8 @@ class _SetupScreenState extends State<SetupScreen> {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: state.isDownloading ? null : cubit.downloadAndLoad,
-                      icon: Icon(state.useMockExtractor ? Icons.save : Icons.download),
-                      label: Text(state.useMockExtractor ? 'Save settings' : 'Download & load'),
+                      icon: const Icon(Icons.download),
+                      label: const Text('Download & load'),
                     ),
                   ),
                   const SizedBox(width: 12),

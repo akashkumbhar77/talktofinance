@@ -31,7 +31,6 @@ void main() {
         gpuSha256: 'a' * 64,
         cpuUrl: 'https://example.com/models/cpu/some_really_long_path_that_could_wrap_or_overflow/gemma.task',
         cpuSha256: 'b' * 64,
-        useMockExtractor: false,
         wifiOnlyDownloads: true,
         selectedTier: 'gpu',
         status: 'A long status message ' * 8,
@@ -41,7 +40,6 @@ void main() {
 
       whenListen(mock, Stream<SetupState>.fromIterable([loaded]), initialState: SetupState.initial());
 
-      when(() => mock.setUseMockExtractor(any())).thenAnswer((_) async {});
       when(() => mock.setWifiOnlyDownloads(any())).thenAnswer((_) async {});
       when(() => mock.setSelectedTier(any())).thenAnswer((_) async {});
       when(() => mock.setGpuUrl(any())).thenAnswer((_) async {});
@@ -63,7 +61,6 @@ void main() {
 
       final s = AddExpenseState.initial().copyWith(
         prefsLoaded: true,
-        useMockExtractor: true,
         text: 'Bought coffee for ₹250 at CCD. ' * 10,
         busy: false,
         isListening: false,
@@ -109,7 +106,6 @@ void main() {
 
       final s = ImportPdfState.initial().copyWith(
         prefsLoaded: true,
-        useMockExtractor: true,
         pdfPath: '/tmp/statement.pdf',
         statementText: 'line ' * 200,
         status: 'Ready.',

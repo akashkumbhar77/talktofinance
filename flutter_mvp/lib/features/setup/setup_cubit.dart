@@ -26,7 +26,6 @@ class SetupCubit extends Cubit<SetupState> {
     final cpuUrl = await _settings.getTierCpuUrl();
     final cpuSha = (await _settings.getTierCpuSha256()) ?? '';
     final selectedTier = await _settings.getSelectedTier();
-    final useMock = await _settings.getUseMockExtractor();
     final wifiOnly = await _settings.getWifiOnlyDownloads();
 
     emit(
@@ -37,15 +36,9 @@ class SetupCubit extends Cubit<SetupState> {
         cpuUrl: cpuUrl,
         cpuSha256: cpuSha,
         selectedTier: selectedTier,
-        useMockExtractor: useMock,
         wifiOnlyDownloads: wifiOnly,
       ),
     );
-  }
-
-  Future<void> setUseMockExtractor(bool v) async {
-    emit(state.copyWith(useMockExtractor: v));
-    await _settings.setUseMockExtractor(v);
   }
 
   Future<void> setWifiOnlyDownloads(bool v) async {
@@ -97,11 +90,6 @@ class SetupCubit extends Cubit<SetupState> {
 
   Future<void> downloadAndLoad() async {
     if (state.isDownloading) return;
-
-    if (state.useMockExtractor) {
-      emit(state.copyWith(status: 'Mock extractor enabled (Gemma disabled).'));
-      return;
-    }
 
     emit(state.copyWith(status: 'Preparing Gemma…', downloadProgress: null, isDownloading: true));
 

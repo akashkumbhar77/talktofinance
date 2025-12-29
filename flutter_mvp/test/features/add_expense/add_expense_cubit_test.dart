@@ -8,7 +8,6 @@ import '../../helpers/mocks.dart';
 
 void main() {
   group('AddExpenseCubit', () {
-    late MockSettingsRepo settings;
     late MockTransactionsRepository transactions;
 
     setUpAll(() {
@@ -24,59 +23,38 @@ void main() {
     });
 
     setUp(() {
-      settings = MockSettingsRepo();
       transactions = MockTransactionsRepository();
     });
 
     blocTest<AddExpenseCubit, AddExpenseState>(
-      'init loads useMockExtractor',
+      'init marks prefsLoaded',
       build: () {
-        when(() => settings.getUseMockExtractor()).thenAnswer((_) async => true);
         return AddExpenseCubit(
-          settings: settings,
           runtime: MockGemmaRuntime(),
           transactions: transactions,
         );
       },
       act: (cubit) => cubit.init(),
       expect: () => [
-        AddExpenseState.initial().copyWith(prefsLoaded: true, useMockExtractor: true),
+        AddExpenseState.initial().copyWith(prefsLoaded: true),
       ],
     );
 
     blocTest<AddExpenseCubit, AddExpenseState>(
-      'extractAndSave (mock mode) emits finalJson and stores to repository',
+      'extractAndSave emits error if model not loaded',
       build: () {
-        when(() => settings.getUseMockExtractor()).thenAnswer((_) async => true);
-        when(
-          () => transactions.addExtraction(
-            rawText: any(named: 'rawText'),
-            extractedJson: any(named: 'extractedJson'),
-            parsed: any(named: 'parsed'),
-          ),
-        ).thenAnswer((_) async {});
         return AddExpenseCubit(
-          settings: settings,
           runtime: MockGemmaRuntime(),
           transactions: transactions,
         );
       },
-      seed: () => AddExpenseState.initial().copyWith(prefsLoaded: true, useMockExtractor: true, text: 'coffee 250 rs'),
+      seed: () => AddExpenseState.initial().copyWith(prefsLoaded: true, text: 'coffee 250 rs'),
       act: (cubit) => cubit.extractAndSave(),
-      verify: (_) {
-        verify(
-          () => transactions.addExtraction(
-            rawText: any(named: 'rawText'),
-            extractedJson: any(named: 'extractedJson'),
-            parsed: any(named: 'parsed'),
-          ),
-        ).called(1);
-      },
       expect: () => [
         // busy=true
         isA<AddExpenseState>().having((s) => s.busy, 'busy', true),
-        // busy=false + finalJson present
-        isA<AddExpenseState>().having((s) => s.busy, 'busy', false).having((s) => s.finalJson.isNotEmpty, 'finalJson', true),
+        // busy=false + error present (because runtime isn't loaded in this unit test)
+        isA<AddExpenseState>().having((s) => s.busy, 'busy', false).having((s) => s.error != null, 'error', true),
       ],
     );
   });

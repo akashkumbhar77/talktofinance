@@ -37,7 +37,6 @@ class _Home extends StatefulWidget {
 class _HomeState extends State<_Home> {
   int _index = 0;
 
-  final SettingsRepo _settings = SettingsRepo();
   final TransactionsRepository _transactions = TransactionsRepository();
   final GemmaRuntime _runtime = GemmaRuntime.instance;
   final PdfOcrService _pdfOcr = PdfOcrService();
@@ -46,21 +45,19 @@ class _HomeState extends State<_Home> {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
-        RepositoryProvider.value(value: _settings),
         RepositoryProvider.value(value: _transactions),
         RepositoryProvider.value(value: _runtime),
         RepositoryProvider.value(value: _pdfOcr),
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider(create: (ctx) => SetupCubit(settings: _settings, runtime: _runtime)..init()),
+          BlocProvider(create: (ctx) => SetupCubit(settings: SettingsRepo(), runtime: _runtime)..init()),
           BlocProvider(
-            create: (ctx) => AddExpenseCubit(settings: _settings, runtime: _runtime, transactions: _transactions)..init(),
+            create: (ctx) => AddExpenseCubit(runtime: _runtime, transactions: _transactions)..init(),
           ),
           BlocProvider(
             create: (ctx) =>
-                ImportPdfCubit(settings: _settings, runtime: _runtime, pdfOcr: _pdfOcr, transactions: _transactions)
-                  ..init(),
+                ImportPdfCubit(runtime: _runtime, pdfOcr: _pdfOcr, transactions: _transactions)..init(),
           ),
           BlocProvider(create: (ctx) => HistoryCubit(transactions: _transactions)..load()),
         ],

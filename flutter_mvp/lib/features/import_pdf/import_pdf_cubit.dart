@@ -9,21 +9,17 @@ import 'package:flutter_mvp/features/import_pdf/import_pdf_state.dart';
 import 'package:flutter_mvp/services/download_cancel_token.dart';
 import 'package:flutter_mvp/services/gemma_runtime.dart';
 import 'package:flutter_mvp/services/ocr/pdf_ocr.dart';
-import 'package:flutter_mvp/services/settings_repo.dart';
 
 class ImportPdfCubit extends Cubit<ImportPdfState> {
   ImportPdfCubit({
-    required SettingsRepo settings,
     required GemmaRuntime runtime,
     required PdfOcrService pdfOcr,
     required TransactionsRepository transactions,
-  })  : _settings = settings,
-        _runtime = runtime,
+  })  : _runtime = runtime,
         _pdfOcr = pdfOcr,
         _transactions = transactions,
         super(ImportPdfState.initial());
 
-  final SettingsRepo _settings;
   final GemmaRuntime _runtime;
   final PdfOcrService _pdfOcr;
   final TransactionsRepository _transactions;
@@ -31,8 +27,7 @@ class ImportPdfCubit extends Cubit<ImportPdfState> {
   DownloadCancelToken? _ocrCancel;
 
   Future<void> init() async {
-    final useMock = await _settings.getUseMockExtractor();
-    emit(state.copyWith(prefsLoaded: true, useMockExtractor: useMock));
+    emit(state.copyWith(prefsLoaded: true));
   }
 
   /// Useful for tests (and future manual import flows).
@@ -134,22 +129,11 @@ class ImportPdfCubit extends Cubit<ImportPdfState> {
 
     emit(state.copyWith(busy: true, status: 'Extracting transactions…', parsed: const [], selected: const {}));
     try {
-      // Reload current preference (Setup can change it while this cubit is alive).
-      final useMock = await _settings.getUseMockExtractor();
-      if (useMock != state.useMockExtractor) {
-        emit(state.copyWith(useMockExtractor: useMock));
+      final sb = StringBuffer();
+      await for (final tok in _runtime.extractStatementJsonStream(state.statementText)) {
+        sb.write(tok);
       }
-
-      String jsonStr;
-      if (useMock) {
-        jsonStr = _mockExtractStatementJson(state.statementText);
-      } else {
-        final sb = StringBuffer();
-        await for (final tok in _runtime.extractStatementJsonStream(state.statementText)) {
-          sb.write(tok);
-        }
-        jsonStr = sb.toString();
-      }
+      final jsonStr = sb.toString();
 
       final arr = json.decode(extractJsonArray(jsonStr)) as List<dynamic>;
       final list = arr.whereType<Map>().map((m) => m.map((k, v) => MapEntry(k.toString(), v))).toList();
@@ -197,28 +181,3 @@ class ImportPdfCubit extends Cubit<ImportPdfState> {
     }
   }
 }
-
-String _mockExtractStatementJson(String statementText) {
-  final lines =
-      statementText.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList(growable: false);
-  final txs = <Map<String, Object?>>[];
-  for (final line in lines) {
-    final amountMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(line);
-    if (amountMatch == null) continue;
-    final amount = double.tryParse(amountMatch.group(1)!);
-    if (amount == null) continue;
-    txs.add({
-      'amount': amount,
-      'currency': line.contains('₹') || line.toLowerCase().contains('inr') || line.toLowerCase().contains('rs')
-          ? 'INR'
-          : (line.contains(r'$') ? 'USD' : null),
-      'merchant': null,
-      'category': null,
-      'date': null,
-      'notes': line,
-      'confidence': 0.25,
-    });
-  }
-  return const JsonEncoder.withIndent('  ').convert(txs);
-}
-

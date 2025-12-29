@@ -6,13 +6,16 @@ class SettingsRepo {
   static const _kTierCpuUrl = 'gemma_tier_cpu_url';
   static const _kTierCpuSha = 'gemma_tier_cpu_sha256';
   static const _kSelectedTier = 'gemma_selected_tier'; // "gpu" | "cpu"
-  static const _kUseMock = 'use_mock_extractor'; // kept for compatibility; now means "use mock instead of Gemma"
   static const _kWifiOnly = 'wifi_only_downloads';
+
+  static const _defaultGpuUrl =
+      'https://github.com/akashkumbhar77/talktofinance/releases/download/Gemma3ModelBundle/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task';
+  static const _defaultCpuUrl =
+      'https://github.com/akashkumbhar77/talktofinance/releases/download/Gemma3ModelBundle/Gemma3-1B-IT_multi-prefill-seq_q8_ekv2048.task';
 
   Future<String> getTierGpuUrl() async {
     final p = await SharedPreferences.getInstance();
-    return p.getString(_kTierGpuUrl) ??
-        'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task';
+    return p.getString(_kTierGpuUrl) ?? _defaultGpuUrl;
   }
 
   Future<String?> getTierGpuSha256() async {
@@ -22,8 +25,7 @@ class SettingsRepo {
 
   Future<String> getTierCpuUrl() async {
     final p = await SharedPreferences.getInstance();
-    return p.getString(_kTierCpuUrl) ??
-        'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task';
+    return p.getString(_kTierCpuUrl) ?? _defaultCpuUrl;
   }
 
   Future<String?> getTierCpuSha256() async {
@@ -79,14 +81,6 @@ class SettingsRepo {
     await p.setBool(_kWifiOnly, v);
   }
 
-  Future<bool> getUseMockExtractor() async {
-    final p = await SharedPreferences.getInstance();
-    return p.getBool(_kUseMock) ?? true;
-  }
-
-  Future<void> setUseMockExtractor(bool v) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setBool(_kUseMock, v);
-  }
+  // NOTE: mock extractor has been removed. The app always uses the on-device model.
 }
 

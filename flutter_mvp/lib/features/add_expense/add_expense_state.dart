@@ -2,7 +2,6 @@ import 'package:equatable/equatable.dart';
 
 class AddExpenseState extends Equatable {
   final bool prefsLoaded;
-  final bool useMockExtractor;
 
   final String text;
   final bool isListening;
@@ -14,7 +13,6 @@ class AddExpenseState extends Equatable {
 
   const AddExpenseState({
     required this.prefsLoaded,
-    required this.useMockExtractor,
     required this.text,
     required this.isListening,
     required this.busy,
@@ -25,7 +23,6 @@ class AddExpenseState extends Equatable {
 
   factory AddExpenseState.initial() => const AddExpenseState(
         prefsLoaded: false,
-        useMockExtractor: true,
         text: '',
         isListening: false,
         busy: false,
@@ -36,7 +33,6 @@ class AddExpenseState extends Equatable {
 
   AddExpenseState copyWith({
     bool? prefsLoaded,
-    bool? useMockExtractor,
     String? text,
     bool? isListening,
     bool? busy,
@@ -46,7 +42,6 @@ class AddExpenseState extends Equatable {
   }) {
     return AddExpenseState(
       prefsLoaded: prefsLoaded ?? this.prefsLoaded,
-      useMockExtractor: useMockExtractor ?? this.useMockExtractor,
       text: text ?? this.text,
       isListening: isListening ?? this.isListening,
       busy: busy ?? this.busy,
@@ -59,7 +54,6 @@ class AddExpenseState extends Equatable {
   @override
   List<Object?> get props => [
         prefsLoaded,
-        useMockExtractor,
         text,
         isListening,
         busy,

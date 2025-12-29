@@ -102,14 +102,6 @@ class _ImportPdfScreenState extends State<ImportPdfScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (state.useMockExtractor)
-                Padding(
-                  padding: const EdgeInsets.only(left: 2),
-                  child: Text(
-                    'Mock extractor is enabled in Setup.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                ),
               if (state.statementText.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Card(

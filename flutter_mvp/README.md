@@ -5,8 +5,7 @@ This folder contains the **Flutter-first MVP** you asked for (Android-first now,
 ## What’s implemented
 
 - **Setup tab**
-  - Stores `model_id` + `model_lib`
-  - Toggle **Mock extractor** (so the app builds/runs before MLC is wired)
+  - Configure the on-device model download (Tier A GPU, Tier B CPU) and load it
 - **Add tab**
   - **Talk to register expense** (speech-to-text)
   - Extracts **transaction JSON** (streamed output) and saves it locally

@@ -8,32 +8,27 @@ import 'package:flutter_mvp/domain/expense_extraction.dart';
 import 'package:flutter_mvp/features/add_expense/add_expense_state.dart';
 import 'package:flutter_mvp/services/gemma_runtime.dart';
 import 'package:flutter_mvp/services/ocr/ocr_service.dart';
-import 'package:flutter_mvp/services/settings_repo.dart';
 import 'package:flutter_mvp/services/speech_service.dart';
 
 class AddExpenseCubit extends Cubit<AddExpenseState> {
   AddExpenseCubit({
-    required SettingsRepo settings,
     required GemmaRuntime runtime,
     required TransactionsRepository transactions,
     SpeechService? speech,
     OcrService? ocr,
-  })  : _settings = settings,
-        _runtime = runtime,
+  })  : _runtime = runtime,
         _transactions = transactions,
         _speech = speech ?? SpeechService(),
         _ocr = ocr ?? OcrService(),
         super(AddExpenseState.initial());
 
-  final SettingsRepo _settings;
   final GemmaRuntime _runtime;
   final TransactionsRepository _transactions;
   final SpeechService _speech;
   final OcrService _ocr;
 
   Future<void> init() async {
-    final useMock = await _settings.getUseMockExtractor();
-    emit(state.copyWith(prefsLoaded: true, useMockExtractor: useMock));
+    emit(state.copyWith(prefsLoaded: true));
   }
 
   void setText(String v) => emit(state.copyWith(text: v));
@@ -90,23 +85,12 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
     emit(state.copyWith(busy: true, error: null, streaming: '', finalJson: ''));
 
     try {
-      // Reload current preference (Setup can change it while this cubit is alive).
-      final useMock = await _settings.getUseMockExtractor();
-      if (useMock != state.useMockExtractor) {
-        emit(state.copyWith(useMockExtractor: useMock));
+      final sb = StringBuffer();
+      await for (final tok in _runtime.extractExpenseJsonStream(input)) {
+        sb.write(tok);
+        emit(state.copyWith(streaming: sb.toString()));
       }
-
-      final String jsonStr;
-      if (useMock) {
-        jsonStr = _mockExtractExpenseJson(input);
-      } else {
-        final sb = StringBuffer();
-        await for (final tok in _runtime.extractExpenseJsonStream(input)) {
-          sb.write(tok);
-          emit(state.copyWith(streaming: sb.toString()));
-        }
-        jsonStr = sb.toString();
-      }
+      final jsonStr = sb.toString();
 
       final obj = json.decode(extractJsonObject(jsonStr)) as Map<String, dynamic>;
       final parsed = ExpenseExtraction.fromJson(obj);
@@ -136,23 +120,3 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
     return super.close();
   }
 }
-
-String _mockExtractExpenseJson(String input) {
-  final amountMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(input);
-  final amount = amountMatch != null ? double.tryParse(amountMatch.group(1)!) : null;
-  final currency = input.contains('₹') || input.toLowerCase().contains('inr') || input.toLowerCase().contains('rs')
-      ? 'INR'
-      : (input.contains(r'$') ? 'USD' : null);
-
-  final out = <String, Object?>{
-    'amount': amount,
-    'currency': currency,
-    'merchant': null,
-    'category': null,
-    'date': null,
-    'notes': null,
-    'confidence': amount == null ? 0.2 : 0.4,
-  };
-  return const JsonEncoder.withIndent('  ').convert(out);
-}
-

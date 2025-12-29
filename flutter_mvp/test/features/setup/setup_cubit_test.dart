@@ -22,7 +22,6 @@ void main() {
         when(() => settings.getTierCpuUrl()).thenAnswer((_) async => 'cpu-url');
         when(() => settings.getTierCpuSha256()).thenAnswer((_) async => 'cpu-sha');
         when(() => settings.getSelectedTier()).thenAnswer((_) async => 'gpu');
-        when(() => settings.getUseMockExtractor()).thenAnswer((_) async => true);
         when(() => settings.getWifiOnlyDownloads()).thenAnswer((_) async => true);
         return SetupCubit(settings: settings, runtime: MockGemmaRuntime());
       },
@@ -35,25 +34,7 @@ void main() {
           cpuUrl: 'cpu-url',
           cpuSha256: 'cpu-sha',
           selectedTier: 'gpu',
-          useMockExtractor: true,
           wifiOnlyDownloads: true,
-        ),
-      ],
-    );
-
-    blocTest<SetupCubit, SetupState>(
-      'downloadAndLoad is a no-op when mock extractor is enabled',
-      build: () {
-        final settings = MockSettingsRepo();
-        return SetupCubit(settings: settings, runtime: MockGemmaRuntime());
-      },
-      seed: () => SetupState.initial().copyWith(useMockExtractor: true, isDownloading: false),
-      act: (cubit) => cubit.downloadAndLoad(),
-      expect: () => [
-        SetupState.initial().copyWith(
-          useMockExtractor: true,
-          isDownloading: false,
-          status: 'Mock extractor enabled (Gemma disabled).',
         ),
       ],
     );
