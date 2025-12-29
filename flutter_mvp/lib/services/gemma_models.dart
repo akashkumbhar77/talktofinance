@@ -22,7 +22,7 @@ class GemmaDefaultTiers {
     tier: GemmaTier.gpu,
     backend: PreferredBackend.gpu,
     // Gemma 3 1B IT (LiteRT/MediaPipe task bundle)
-    url: 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task',
+    url: 'https://github.com/akashkumbhar77/talktofinance/releases/download/Gemma3ModelBundle/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task',
     sha256Hex: null,
   );
 
@@ -31,7 +31,7 @@ class GemmaDefaultTiers {
   static const cpu = GemmaTierConfig(
     tier: GemmaTier.cpu,
     backend: PreferredBackend.cpu,
-    url: 'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task',
+    url: 'https://github.com/akashkumbhar77/talktofinance/releases/download/Gemma3ModelBundle/Gemma3-1B-IT_multi-prefill-seq_q8_ekv2048.task',
     sha256Hex: null,
   );
 }
